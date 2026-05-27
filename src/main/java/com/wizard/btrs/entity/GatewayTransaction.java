@@ -18,6 +18,7 @@ public class GatewayTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true)
     private String txnId;
 
     private BigDecimal amount;

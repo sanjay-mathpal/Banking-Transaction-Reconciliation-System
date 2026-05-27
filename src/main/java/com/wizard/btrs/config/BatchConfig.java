@@ -1,12 +1,15 @@
 package com.wizard.btrs.config;
 
+import com.wizard.btrs.dto.BankTransactionRecord;
 import com.wizard.btrs.dto.GatewayTransactionRecord;
+import com.wizard.btrs.entity.ReconciledTransaction;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +25,15 @@ public class BatchConfig {
 
     private final ItemWriter<GatewayTransactionRecord>
             gatewayTransactionWriter;
+    private final FlatFileItemReader<BankTransactionRecord>
+            bankTransactionReader;
+
+    private final ItemProcessor<
+                BankTransactionRecord,
+                ReconciledTransaction> reconciliationProcessor;
+
+    private final ItemWriter<ReconciledTransaction>
+            reconciliationWriter;
 
     @Bean
     public Step gatewayLoadingStep(
@@ -42,9 +54,29 @@ public class BatchConfig {
     }
 
     @Bean
+    public Step reconciliationStep(
+            JobRepository jobRepository,
+            PlatformTransactionManager transactionManager
+    ) {
+
+        return new StepBuilder(
+                "reconciliationStep",
+                jobRepository
+        )
+                .<BankTransactionRecord,
+                        ReconciledTransaction>chunk(2)
+                .transactionManager(transactionManager)
+                .reader(bankTransactionReader)
+                .processor(reconciliationProcessor)
+                .writer(reconciliationWriter)
+                .build();
+    }
+
+    @Bean
     public Job reconciliationJob(
             JobRepository jobRepository,
-            Step gatewayLoadingStep
+            Step gatewayLoadingStep,
+            Step reconciliationStep
     ) {
 
         return new JobBuilder(
@@ -52,6 +84,7 @@ public class BatchConfig {
                 jobRepository
         )
                 .start(gatewayLoadingStep)
+                .next(reconciliationStep)
                 .build();
     }
 }
