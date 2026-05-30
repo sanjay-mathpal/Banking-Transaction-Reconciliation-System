@@ -1,5 +1,7 @@
 package com.wizard.btrs.config;
 
+import com.wizard.btrs.batch.tasklet.CleanupTasklet;
+import com.wizard.btrs.batch.tasklet.ExtraGatewayCheckTasklet;
 import com.wizard.btrs.dto.BankTransactionRecord;
 import com.wizard.btrs.dto.GatewayTransactionRecord;
 import com.wizard.btrs.entity.ReconciledTransaction;
@@ -89,11 +91,25 @@ public class BatchConfig {
     }
 
     @Bean
+    public Step extraGatewayCheckStep(
+            JobRepository jobRepository,
+            PlatformTransactionManager transactionManager,
+            ExtraGatewayCheckTasklet tasklet) {
+
+        return new StepBuilder(
+                "extraGatewayCheckStep",
+                jobRepository)
+                .tasklet(tasklet, transactionManager)
+                .build();
+    }
+
+    @Bean
     public Job reconciliationJob(
             JobRepository jobRepository,
             Step cleanupStep,
             Step gatewayLoadingStep,
-            Step reconciliationStep
+            Step reconciliationStep,
+            Step extraGatewayCheckStep
     ) {
 
         return new JobBuilder(
@@ -103,6 +119,7 @@ public class BatchConfig {
                 .start(cleanupStep)
                 .next(gatewayLoadingStep)
                 .next(reconciliationStep)
+                .next(extraGatewayCheckStep)
                 .build();
     }
 }
