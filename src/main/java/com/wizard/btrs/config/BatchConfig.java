@@ -31,9 +31,25 @@ public class BatchConfig {
     private final ItemProcessor<
                 BankTransactionRecord,
                 ReconciledTransaction> reconciliationProcessor;
+    private final CleanupTasklet cleanupTasklet;
 
     private final ItemWriter<ReconciledTransaction>
             reconciliationWriter;
+
+    @Bean
+    public Step cleanupStep( JobRepository jobRepository,
+                             PlatformTransactionManager transactionManager) {
+
+        return new StepBuilder(
+                "cleanupStep",
+                jobRepository
+        )
+                .tasklet(
+                        cleanupTasklet,
+                        transactionManager
+                )
+                .build();
+    }
 
     @Bean
     public Step gatewayLoadingStep(
@@ -75,6 +91,7 @@ public class BatchConfig {
     @Bean
     public Job reconciliationJob(
             JobRepository jobRepository,
+            Step cleanupStep,
             Step gatewayLoadingStep,
             Step reconciliationStep
     ) {
@@ -83,7 +100,8 @@ public class BatchConfig {
                 "reconciliationJob",
                 jobRepository
         )
-                .start(gatewayLoadingStep)
+                .start(cleanupStep)
+                .next(gatewayLoadingStep)
                 .next(reconciliationStep)
                 .build();
     }
